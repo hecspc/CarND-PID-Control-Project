@@ -28,14 +28,67 @@ std::string hasData(std::string s) {
   return "";
 }
 
+bool twiddle_on_ = false;
+double twiddle_best_error_ = 1000000;
+bool twiddle_state_ = 0;
+int twiddle_idx = 0;
+int twiddle_iterations_ = 0;
+std::vector<double> p = {0.27, 0.001, 3.0};
+std::vector<double> dp = {0.05, 0.001, 0.05};
+void twiddle(PID &pid_control) {
+    std::cout << "State: " << twiddle_state_ << std::endl;
+    std::cout << "PID Error: " << pid_control.TotalError() << ", Best Error: " << twiddle_best_error_ << std::endl;
+    if (twiddle_state_ == 0) {
+        twiddle_best_error_ = pid_control.TotalError();
+        p[twiddle_idx] += dp[twiddle_idx];
+        twiddle_state_ = 1;
+    } else if (twiddle_state_ == 1) {
+        if (pid_control.TotalError() < twiddle_best_error_) {
+            twiddle_best_error_ = pid_control.TotalError();
+            dp[twiddle_idx] *= 1.1;
+            twiddle_idx = (twiddle_idx + 1) % 3;
+            p[twiddle_idx] += dp[twiddle_idx];
+            twiddle_state_ = 1;
+        } else {
+            p[twiddle_idx] -= 2 * dp[twiddle_idx];
+            if (p[twiddle_idx] < 0) {
+                p[twiddle_idx] = 0;
+                twiddle_idx = (twiddle_idx + 1) % 3;
+            }
+            twiddle_state_ = 2;
+        }
+    } else { //twiddle_state_ = 2
+        if (pid_control.TotalError() < twiddle_best_error_) {
+            twiddle_best_error_ = pid_control.TotalError();
+            dp[twiddle_idx] *= 1.1;
+            twiddle_idx = (twiddle_idx + 1) % 3;
+            p[twiddle_idx] += dp[twiddle_idx];
+            twiddle_state_ = 1;
+        } else {
+            p[twiddle_idx] += dp[twiddle_idx];
+            dp[twiddle_idx] *= 0.9;
+            twiddle_idx = (twiddle_idx + 1) % 3;
+            p[twiddle_idx] += dp[twiddle_idx];
+            twiddle_state_ = 1;
+        }
+    }
+    
+    pid_control.Init(p[0], p[1], p[2]);
+}
+
 int main()
 {
   uWS::Hub h;
 
-  PID pid;
+  PID pid_steer;
+  PID pid_speed;
   // TODO: Initialize the pid variable.
+    
+//    pid_steer.Init(0.15, 0.001, 1.5);
+    pid_steer.Init(0.32, 0.0, 3);
+    pid_speed.Init(0.2, 0.0001, 2.0);
 
-  h.onMessage([&pid](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+  h.onMessage([&pid_steer, &pid_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -50,7 +103,8 @@ int main()
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          double steer_value;
+          double steer_value, speed_value, throttle_value;
+          double desired_speed = 30.0;
           /*
           * TODO: Calcuate steering value here, remember the steering value is
           * [-1, 1].
@@ -58,15 +112,51 @@ int main()
           * another PID controller to control the speed!
           */
           
+            pid_steer.UpdateError(cte);
+            steer_value = pid_steer.TotalError();
+            if (steer_value > 1.0)
+                steer_value = 1.0;
+            if (steer_value < -1.0)
+                steer_value = -1.0;
+            
+            double speed_error = speed - desired_speed;
+            pid_speed.UpdateError(speed_error);
+            speed_value = pid_speed.TotalError();
+            
+            
           // DEBUG
-          std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
-
-          json msgJson;
-          msgJson["steering_angle"] = steer_value;
-          msgJson["throttle"] = 0.3;
-          auto msg = "42[\"steer\"," + msgJson.dump() + "]";
-          std::cout << msg << std::endl;
-          ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            
+            if (twiddle_on_) {
+                twiddle_iterations_++;
+                
+                // Let it start running a bit first and also reset if car crashes
+                if ((twiddle_iterations_ > 1000) || ((speed<desired_speed*0.5) && twiddle_iterations_ > 80)) {
+                    if ((speed<desired_speed*0.5) && twiddle_iterations_ > 80) {
+                        twiddle_best_error_ = 1000000;
+                        std::string msg = "42[\"reset\", {}]";
+                        std::cout << msg << std::endl;
+                        ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+                    }
+                    
+                    twiddle(pid_steer);
+                    std::cout << "P VECTOR: " << p[0] << "\t" << p[1] << "\t" << p[2] << std::endl;
+                    twiddle_iterations_ = 0;
+                }
+                
+                json msgJson;
+                msgJson["steering_angle"] = steer_value;
+                msgJson["throttle"] = speed_value;
+                auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+                ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            } else {
+                std::cout << "CTE: " << cte << " Steering Value: " << steer_value << " Throttle value: " << speed_value << std::endl;
+                json msgJson;
+                msgJson["steering_angle"] = steer_value;
+                msgJson["throttle"] = speed_value;
+                auto msg = "42[\"steer\"," + msgJson.dump() + "]";
+                //          std::cout << msg << std::endl;
+                ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+            }
         }
       } else {
         // Manual driving

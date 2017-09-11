@@ -16,7 +16,12 @@ public:
   double Kp;
   double Ki;
   double Kd;
-
+    
+    /*
+     * cross track error components
+     */
+    double cte_prev;
+    
   /*
   * Constructor
   */
