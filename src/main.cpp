@@ -84,8 +84,8 @@ int main()
   PID pid_speed;
   // TODO: Initialize the pid variable.
     
-//    pid_steer.Init(0.15, 0.001, 1.5);
-    pid_steer.Init(0.32, 0.0, 3);
+//    pid_steer.Init(0.32, 0.0004, 3);
+    pid_steer.Init(0.265, 0.0, 3);
     pid_speed.Init(0.2, 0.0001, 2.0);
 
   h.onMessage([&pid_steer, &pid_speed](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
@@ -130,7 +130,7 @@ int main()
                 twiddle_iterations_++;
                 
                 // Let it start running a bit first and also reset if car crashes
-                if ((twiddle_iterations_ > 1000) || ((speed<desired_speed*0.5) && twiddle_iterations_ > 80)) {
+                if ((twiddle_iterations_ > 100) || ((speed<desired_speed*0.5) && twiddle_iterations_ > 80)) {
                     if ((speed<desired_speed*0.5) && twiddle_iterations_ > 80) {
                         twiddle_best_error_ = 1000000;
                         std::string msg = "42[\"reset\", {}]";

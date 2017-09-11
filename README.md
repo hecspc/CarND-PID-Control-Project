@@ -3,6 +3,45 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+
+## PID Controller
+
+Given a trajectory we want the car to follow and `cte` is the cross track error given the position of the car, our goal is to control the car to follow the desire track smoothly.
+
+To achieve this goal we make use of the PID controller. The PID controller has 3 components:
+
+
+### P Proportional (gain)
+We multiply the `cte` by a negative proportional constant `Kp`. This coefficient `Kp` represents the band over the controller's output is proportional to the error of the system. The issue is that the controll will always overshoot the desired value, so there will be always an error between the desired value and the current value which will oscilate.
+
+
+### I Integral components (reset)
+This component will average the `cte` over a period of time and multiplied by a component `Ki`. It represents the steady error of the system and will remove the error from the mesaurements. In our case this could be due to a misaligments of the wheels, for example.
+
+### D Differential components (rate)
+This component calculates the rate of change the `cte` with respect of time and multiplied by a component `Kd`. This term determines the system's response to a change or disturbance. The larger the component, the more rapidly the controller will respond to the changes. In our case how fast the car is goint to recover.
+
+## Tuning PID controller coefficients
+
+To tune the coefficients `Kp`, `Ki` and `Kd` I  have used the __Twiddle__ algorithm implemented in the lines 31-76 in `main.cpp` file.
+
+The twiddle algorithm adjusts the coefficients of the PID controller trying to find the best overall error.
+
+By default Twiddle is off, but to enable the variable `twiddle_on_` in the line 31 should be set to `true`;
+
+After running the simulation several times during a long period of time, I have found this values for the smoothest experience:
+
+```
+pid_steer.Init(0.265, 0.0, 3);
+```
+
+It is noticeable that according to the thw Twiddle algorithm the `Ki` component, which measures the systematic errors from the system, is zero, meaning we can assume there are perfect steering. Given this is a simulation, it makes sense.
+
+
+
+
+
+
 ## Dependencies
 
 * cmake >= 3.5
