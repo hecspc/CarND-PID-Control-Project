@@ -3,6 +3,8 @@ Self-Driving Car Engineer Nanodegree Program
 
 ---
 
+The video `output.m4v` shows a lap on the simulator using the provided code.
+
 
 ## PID Controller
 
@@ -36,6 +38,7 @@ pid_steer.Init(0.265, 0.0, 3);
 ```
 
 It is noticeable that according to the thw Twiddle algorithm the `Ki` component, which measures the systematic errors from the system, is zero, meaning we can assume there are perfect steering. Given this is a simulation, it makes sense.
+
 
 
 
